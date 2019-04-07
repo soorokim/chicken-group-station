@@ -1,33 +1,38 @@
 <template>
-  <div v-else class="card mt-3">
+  <div class="card mt-3">
     <div class="card-title">
       <h3>치킨 모임 정거장</h3>
       <hr>
     </div>
-    <div v-if="k_id === ''" id="need_login">
+    <div v-if="user.k_id === ''" id="need_login">
       <p>로그인이 필요한 곳입니다.</p>
       <div class="login_btn" v-on:click="loginWithKakao">
-        <img src="//mud-kage.kakao.com/14/dn/btqbjxsO6vP/KPiGpdnsubSq3a0PHEGUK1/o.jpg"  width="300"/>
+          <img src="//mud-kage.kakao.com/14/dn/btqbjxsO6vP/KPiGpdnsubSq3a0PHEGUK1/o.jpg"  width="300"/>
       </div>
     </div>
     <div v-else id="logged_in">
       <div class="my-info-body" >
         <label for="my-info">내 정보</label>
-        <img :src="k_img">
-        <p><span class="my-info">닉네임 : {{ k_nick }} </span></p>
+        <img :src="user.k_img">
+        <p><span class="my-info">닉네임 : {{ user.k_nick }} </span></p>
       </div>
       <div class="card-body">
         <div class="chat-body">
           <div class="messages" v-for="(msg, index) in msgs" :key="index">
-            <p><span class="font-weight-bold">{{ msg.k_nick }}: </span>{{ msg.msg }}</p>
+            <p>
+              <img v-if="msg.k_id != 'SERVER'"
+                    v-bind:src="user_list[msg.k_id].img"
+                    id="user_img">
+                <span v-if="msg.k_id == 'SERVER'" class="font-weight-bold">{{ msg.k_id}}: </span>
+                <span v-else class="font-weight-bold">{{ user_list[msg.k_id].nick }}: </span>{{ msg.msg }}</p>
           </div>
         </div>
       </div>
       <div class="user-list-body">
         <div class="gorm-group pb-3">
           <label for="user-list">접속한 사용자:</label>
-          <div class="user-list" v-for="(user, index) in user_list" :key="index">
-            <p><span class="font-weight-bold">{{ user }}</span></p>
+          <div class="user-list" v-for="(user,index) in user_list" :key="index">
+            <p> <img v-bind:src="user.img" id="user_img"> <span class="font-weight-bold">{{ user.nick }}</span></p>
           </div>
         </div>
       </div>
@@ -44,18 +49,21 @@
 </template>
 
 <script>
+/* eslint-disable */
 import io from 'socket.io-client'
 import Config from '@/assets/js/config'
 export default {
   data(){
     return {
-      k_id: '',
-      k_nick: '',
-      k_img: '',
+      user: {
+        k_id: '',
+        k_nick: '',
+        k_img: '',
+      },
       msg: '',
       msgs : [],
-      user_list : [],
-      socket : io(Config.server_url),
+      user_list : {},
+      socket : io("172.30.1.14:8080"),
       scriptUrl : Config.kakao_sdk,
       apiKey : Config.kakao_apikey
     }
@@ -63,9 +71,11 @@ export default {
   methods: {
       send_msg(e){
         e.preventDefault();
-        let data = { k_nick: this.k_nick, msg: this.msg }
-        this.socket.emit('send_msg',data);
-        this.msg = ""
+        if(this.msg){
+          let data = { k_id: this.user.k_id, msg: this.msg }
+          this.socket.emit('send_msg',data);
+          this.msg = ""
+        }
       },
       get_user(){
         const scriptId = '_kakao_login_'
@@ -91,10 +101,10 @@ export default {
 
       onSuccess(data){
         console.log('success');
-        this.k_id = data.id
-        this.k_nick = data.properties.nickname
-        this.k_img = data.properties.thumbnail_image
-        this.socket.emit('newUser',this.k_nick);
+        this.user.k_id = data.id
+        this.user.k_nick = data.properties.nickname
+        this.user.k_img = data.properties.thumbnail_image
+        this.socket.emit('newUser',this.user);
       },
 
       onFailure(data){
@@ -143,8 +153,12 @@ export default {
       //this.msgs.push(data)
     });
 
-    this.socket.on('user_update',(user) => {
-      this.user_list = user
+    this.socket.on('user_update',(users) => {
+      console.log("user update! ")
+      users.forEach((user) => {
+        this.$set(this.user_list, user.k_id, {'img': user.k_img, 'nick':user.k_nick})
+      })
+      console.log(this.user_list)
     });
   }
 
@@ -153,6 +167,11 @@ export default {
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped>
+#user_img {
+    width: 25px; height: 25px;
+    object-fit: cover;
+    border-radius: 23%;
+}
 .chat-body {
   width: 580px;
   padding: 20px;
