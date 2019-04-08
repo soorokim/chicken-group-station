@@ -6,8 +6,8 @@
     </div>
     <div v-if="user.k_id === ''" id="need_login">
       <p>로그인이 필요한 곳입니다.</p>
-      <div class="login_btn" v-on:click="loginWithKakao">
-          <img src="//mud-kage.kakao.com/14/dn/btqbjxsO6vP/KPiGpdnsubSq3a0PHEGUK1/o.jpg"  width="300"/>
+      <div class="login_btn" >
+          <img src="//mud-kage.kakao.com/14/dn/btqbjxsO6vP/KPiGpdnsubSq3a0PHEGUK1/o.jpg" v-on:click="loginWithKakao" width="300"/>
       </div>
     </div>
     <div v-else id="logged_in">
@@ -28,14 +28,20 @@
           </div>
         </div>
       </div>
+
       <div class="user-list-body">
         <div class="gorm-group pb-3">
           <label for="user-list">접속한 사용자:</label>
-          <div class="user-list" v-for="(user,index) in user_list" :key="index">
-            <p> <img v-bind:src="user.img" id="user_img"> <span class="font-weight-bold">{{ user.nick }}</span></p>
+          <button type="button" name="kick" value="강퇴" @click='kick_user()' v-if='user.perm'>강퇴하기</button>
+          <div class="user-list" v-for="(_user,index) in user_list" :key="index" >
+            <p>
+              <input type="checkbox" :id="_user.id" :value="_user.id" v-model="checked_id" v-if='user.perm'>
+              <img v-bind:src="_user.img" id="user_img"> <span class="font-weight-bold">{{ _user.nick }}</span>
+            </p>
           </div>
         </div>
       </div>
+
       <div class="chat-input">
         <form @submit.prevent="send_msg">
           <div class="gorm-group pb-3">
@@ -59,11 +65,13 @@ export default {
         k_id: '',
         k_nick: '',
         k_img: '',
+        perm: false,
       },
       msg: '',
+      checked_id : [],
       msgs : [],
       user_list : {},
-      socket : io("172.30.1.14:8080"),
+      socket : io(Config.server_url),
       scriptUrl : Config.kakao_sdk,
       apiKey : Config.kakao_apikey
     }
@@ -77,13 +85,12 @@ export default {
           this.msg = ""
         }
       },
-      get_user(){
+      make_kakao_login(){
         const scriptId = '_kakao_login_'
 
         const isExist = !!document.getElementById(scriptId)
 
         if (!isExist) {
-          console.log(this.scriptUrl);
           const script = document.createElement('script')
           script.src = this.scriptUrl
           script.onload = () => this.initiate()
@@ -95,16 +102,28 @@ export default {
         }
       },
 
+      kick_user(){
+        if (this.checked_id){
+          let data = {}
+          data.reason = prompt("사유를 입력해 주세요")
+          this.checked_id.forEach((id) => {
+            data.k_id = id
+            this.socket.emit('kick',data);
+          })
+        }
+      },
+
       initiate(){
         Kakao.init(this.apiKey);
       },
 
       onSuccess(data){
         console.log('success');
-        this.user.k_id = data.id
-        this.user.k_nick = data.properties.nickname
-        this.user.k_img = data.properties.thumbnail_image
-        this.socket.emit('newUser',this.user);
+        let user = {}
+        user.k_id = data.id
+        user.k_nick = data.properties.nickname
+        user.k_img = data.properties.thumbnail_image
+        this.socket.emit('newUser',user);
       },
 
       onFailure(data){
@@ -145,21 +164,40 @@ export default {
   },
   mounted() {
     this.socket.on('connect',() => {
-      this.get_user()
+      console.log('connect')
+    })
+
+    this.socket.on('user_data',(user) => {
+      if (user) {
+        this.user = user
+      } else {
+        alert("입장하실수 없습니다.")
+      }
     })
 
     this.socket.on('update',(data) => {
       this.msgs = [...this.msgs, data];
+      let msgbox = this.$el.querySelector('.chat-body')
+      msgbox.scrollTop = msgbox.scrollHeight;
       //this.msgs.push(data)
     });
 
     this.socket.on('user_update',(users) => {
       console.log("user update! ")
+      this.user_list = {}
       users.forEach((user) => {
-        this.$set(this.user_list, user.k_id, {'img': user.k_img, 'nick':user.k_nick})
+        this.$set(this.user_list, user.k_id, {'img': user.k_img, 'nick':user.k_nick, 'id':user.k_id})
       })
       console.log(this.user_list)
     });
+
+    this.socket.on('forced_out',(reason) => {
+      alert("추방당하셨습니다. 사유: "+reason)
+      setTimeout(function(){ document.location.reload(); }, 5000);
+    });
+  },
+  created() {
+    this.make_kakao_login()
   }
 
 }
@@ -173,6 +211,8 @@ export default {
     border-radius: 23%;
 }
 .chat-body {
+  overflow:scroll;
+  height:400px;
   width: 580px;
   padding: 20px;
   margin-bottom: 20px;
@@ -181,6 +221,7 @@ export default {
 }
 
 .user-list-body {
+  overflow:scroll;
   width: 260px;
   padding: 20px;
   margin-bottom: 20px;
