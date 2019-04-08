@@ -13,13 +13,33 @@ io.sockets.on('connection', function(socket){
   socket.on('newUser',async (data) => {
     ip_re = /(\d+).(\d+).(\d+).(\d+)/g
     address = socket.handshake.address
-    ip = ip_re.exec(address)[0]
-    user = await db.check_user(data)
-    if (!user) {
+    ip = ip_re.exec(address)
+    if (ip) {
+      ip = ip[0]
+    } else {
+      ip = 'unknown'
+    }
+    user = await db.check_user(data.k_id)
+    if(!user){ //db에 user data가 없을때
       db.set_user(data.k_id, data.k_nick, data.k_img, 0)
+      user = data
+    }else{ //db에 user data가 있을때
+      if(user.status === "out"){
+          //연결 끊기 !
+          socket.disconnect
+          console.log("강퇴된 유저 입니다.")
+          db.set_log(ip, data.k_id, 'out', '강제퇴장당한 유저입니다.')
+          io.to(socket.id).emit('user_data')
+          return
+      }
+      if (data.k_nick != user.k_nick || data.k_img != user.k_img){
+        db.change_user_data(data)
+        user.k_nick = data.k_nick
+        user.k_img = data.k_img
+      }
     }
 
-    db.chang_stat(data.k_id, "on")
+    db.set_stat(data.k_id, 'on')
 
     let wel_msg = data.k_nick + '님이 접속 하셨습니다.'
     io.sockets.emit('update', {
@@ -28,11 +48,14 @@ io.sockets.on('connection', function(socket){
       msg : wel_msg
     })
 
-    db.set_log(ip, data.k_id, "login")
+    io.to(socket.id).emit('user_data', user)
+
+    db.set_log(ip, data.k_id, 'login')
     socket.ip = ip
     socket.k_nick = data.k_nick
     socket.k_id = data.k_id
     user_list = await db.get_user_list()
+
     //모두에게 메세지를 날리는 방법
     io.sockets.emit('user_update', user_list)
   })
@@ -43,10 +66,36 @@ io.sockets.on('connection', function(socket){
     io.sockets.emit('update', data)
   })
 
-  socket.on('disconnect',function(){
-    if (!socket.k_nick) {
+  socket.on('kick', async (data) => {
+    await io.of('/').clients((err,clients) => {
+      clients.forEach( async (socket_id) => {
+        let cl_socket = io.sockets.connected[socket_id]
+        if (cl_socket.k_id == data.k_id){
+          await db.set_stat(data.k_id, 'out')
+          db.set_log(ip, data.k_id, 'forced_out', data.reason)
+          io.to(socket_id).emit('forced_out',data.reason)
+
+          let fout_msg = cl_socket.k_nick + "님이 추방당했습니다.\n 사유:" + data.reason
+          cl_socket.broadcast.emit('update', {
+            type : 'forced_out',
+            k_id : 'SERVER',
+            msg : fout_msg
+          })
+          cl_socket.disconnect(data.reason);
+        }
+      })
+    })
+    console.log(4)
+    user_list = await db.get_user_list()
+    console.log(user_list)
+    io.sockets.emit('user_update', user_list)
+  })
+
+  socket.on('disconnect',async (reason) => {
+    if (!socket.k_nick || reason == "server namespace disconnect") {
       return
     }
+
     let dis_msg = socket.k_nick + "님이 나갔습니다."
     socket.broadcast.emit('update', {
       type : 'disconnect',
@@ -55,10 +104,9 @@ io.sockets.on('connection', function(socket){
     })
 
     //user 상태를 off로
-    db.chang_stat(data.k_id, "off")
-
+    db.set_stat(socket.k_id, 'off')
     //logout log 남기기
-    db.set_log(ip, data.k_id, "logout")
+    db.set_log(ip, socket.k_id, 'logout')
 
     user_list = await db.get_user_list()
     //본인을 제외한 모두에게 메세지를 날리는 방법
