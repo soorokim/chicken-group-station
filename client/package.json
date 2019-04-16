@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "serve": "vue-cli-service serve",
+    "serve": "vue-cli-service serve --port 8000 --host localhost --public",
     "build": "vue-cli-service build",
     "lint": "vue-cli-service lint"
   },
@@ -29,8 +29,7 @@
       "plugin:vue/essential",
       "eslint:recommended"
     ],
-    "rules": {
-    },
+    "rules": {},
     "parserOptions": {
       "parser": "babel-eslint"
     }
