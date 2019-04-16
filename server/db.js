@@ -8,11 +8,25 @@ const db = mysql.createPool({
   database : config.db.name,
   charset : config.db.charset
 })
+
+const test = async () => {
+  try {
+    const connection = await db.getConnection(async conn => conn);
+    console.log('connected!')
+    connection.release();
+  } catch(err) {
+    console.log('DB Error');
+    return false
+  }
+}
 exports.change_user_data = async (user) => {
   try {
     const connection = await db.getConnection(async conn => conn);
     try {
         query = `UPDATE chat_user SET k_nick=?,k_img=? WHERE k_id=?`
+        if(!user.k_img){ //기본이미지
+          user.k_img = "http://k.kakaocdn.net/dn/rJu1X/btqtS6FAMyF/zSCs8XLXN7RTKjO4FKftYK/profile_110x110c.jpg"
+        }
         await connection.query(query,[user.k_nick,user.k_img,user.k_id])
         connection.release();
     } catch(err) {
@@ -49,13 +63,11 @@ exports.check_user = async (id) => {
 };
 
 exports.set_stat = async (id, stat) => {
-  console.log(1)
   try {
     const connection = await db.getConnection(async conn => conn);
     try {
       query = `UPDATE chat_user SET status=? WHERE k_id=?`
       await connection.query(query,[stat, id])
-      console.log(2)
       connection.release();
     } catch(err) {
       console.log('Query Error : set_stat');
@@ -67,7 +79,6 @@ exports.set_stat = async (id, stat) => {
     console.log('DB Error');
     return false
   }
-  console.log(3)
 };
 
 exports.set_user = async (id, nick, img, perm) => {
@@ -92,13 +103,11 @@ exports.set_user = async (id, nick, img, perm) => {
 }
 
 exports.get_user_list = async () => {
-  console.log(5);
   try {
     const connection = await db.getConnection(async conn => conn);
     try {
       query = `SELECT k_id,k_nick,k_img,perm FROM chat_user WHERE status=?`
       const rows = await connection.query(query, ["on"]);
-      console.log(6);
       connection.release();
       return rows[0]
     } catch(err) {
@@ -111,7 +120,6 @@ exports.get_user_list = async () => {
     console.log('DB Error');
     return false
   }
-  console.log(7);
 }
 
 exports.get_user_list = async () => {
@@ -157,3 +165,5 @@ exports.set_log = async (ip, k_id, type,reson) => {
     return false
   }
 }
+
+test()

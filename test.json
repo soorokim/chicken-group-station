@@ -1,0 +1,26 @@
+{
+  "config": {
+    "target": "http://soorokim.duckdns.org:19224",
+    "phases": [
+      {"duration": 150, "arrivalRate":2 }
+    ],
+    "payload": {
+      "path" : "./test.csv",
+      "fields" : ["id","nick","img","msg"],
+    }
+  },
+  "scenarios": [
+      {
+        "engine": "socketio",
+        "flow": [
+          {"emit": { "channel": "newUser", "data": { "k_id": "{{id}}", "k_nick": "{{nick}}", "k_img": "{{img}}"}}},
+          {"think": 240},
+          {"loop": [
+            {"emit": { "channel": "send_msg", "data": { "k_id": "{{id}}", "msg": "{{msg}}"}}},
+          ],
+          "count" : 5
+          }
+        ]
+      }
+    ]
+}

@@ -16,22 +16,22 @@
         <img :src="user.k_img">
         <p><span class="my-info">닉네임 : {{ user.k_nick }} </span></p>
       </div>
-      <div class="card-body">
-        <div class="chat-body">
-          <div class="messages" v-for="(msg, index) in msgs" :key="index">
-            <p>
-              <img v-if="msg.k_id != 'SERVER'"
-                    v-bind:src="user_list[msg.k_id].img"
-                    id="user_img">
-                <span v-if="msg.k_id == 'SERVER'" class="font-weight-bold">{{ msg.k_id}}: </span>
-                <span v-else class="font-weight-bold">{{ user_list[msg.k_id].nick }}: </span>{{ msg.msg }}</p>
-          </div>
+
+      <div class="chat-body">
+        <div class="messages" v-for="(msg, index) in msgs" :key="index">
+          <p>
+            <img v-if="msg.id != 'SERVER'"
+            v-bind:src="msg.img"
+            id="user_img">
+            <span v-if="msg.id == 'SERVER'" class="font-weight-bold">{{msg.id}}: </span>
+            <span v-else class="font-weight-bold">{{ msg.nick }}: </span>{{ msg.msg }}
+          </p>
         </div>
       </div>
 
       <div class="user-list-body">
         <div class="gorm-group pb-3">
-          <label for="user-list">접속한 사용자:</label>
+          <label for="user-list">접속한 사용자 ({{Object.keys(user_list).length}}) 명  </label>
           <button type="button" name="kick" value="강퇴" @click='kick_user()' v-if='user.perm'>강퇴하기</button>
           <div class="user-list" v-for="(_user,index) in user_list" :key="index" >
             <p>
@@ -176,10 +176,29 @@ export default {
     })
 
     this.socket.on('update',(data) => {
-      this.msgs = [...this.msgs, data];
-      let msgbox = this.$el.querySelector('.chat-body')
-      msgbox.scrollTop = msgbox.scrollHeight;
-      //this.msgs.push(data)
+      if(this.user_list[data.k_id] || data.k_id == "SERVER"){ 
+        let msg = {}
+        if (data.k_id == "SERVER"){
+           msg = {
+	    'msg': data.msg,
+            'id': data.k_id
+           }
+         } else {
+
+	  msg = {
+	  'img': this.user_list[data.k_id].img,
+	  'nick': this.user_list[data.k_id].nick,
+	  'msg': data.msg,
+	  'id': data.k_id
+	  }
+        }
+        this.msgs = [...this.msgs, msg];
+        let msgbox = this.$el.querySelector('.chat-body')
+        msgbox.scrollTop = msgbox.scrollHeight+20;
+      } else {
+        console.log("err : ")
+        console.log(data)
+      }
     });
 
     this.socket.on('user_update',(users) => {
@@ -213,7 +232,7 @@ export default {
 .chat-body {
   overflow:scroll;
   height:400px;
-  width: 580px;
+  width: 400x;
   padding: 20px;
   margin-bottom: 20px;
   float: left;
@@ -222,7 +241,8 @@ export default {
 
 .user-list-body {
   overflow:scroll;
-  width: 260px;
+  height:400px;
+  width: 200px;
   padding: 20px;
   margin-bottom: 20px;
   float: right;
@@ -247,5 +267,38 @@ export default {
 .need_login {
   margin: 0 auto;
   align: center;
+}
+
+@media ( max-width:480) {
+#user_img {
+    width: 10px; height: 10px;
+    object-fit: cover;
+    border-radius: 23%;
+}
+.chat-body {
+  width: 100%;
+  float: none;
+}
+
+.user-list-body {
+  width: 100%;
+  float: none;
+}
+
+.chat-input {
+  clear: both;
+  padding: 20px;
+  border: 1px solid #bcbcbc;
+}
+
+.my-info-body {
+  width: 100%;
+  float: none;
+}
+
+.need_login {
+  margin: 0 auto;
+  align: center;
+}
 }
 </style>

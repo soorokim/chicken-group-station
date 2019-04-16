@@ -19,7 +19,7 @@ io.sockets.on('connection', function(socket){
     } else {
       ip = 'unknown'
     }
-    user = await db.check_user(data.k_id)
+    let user = await db.check_user(data.k_id)
     if(!user){ //db에 user data가 없을때
       db.set_user(data.k_id, data.k_nick, data.k_img, 0)
       user = data
@@ -32,14 +32,20 @@ io.sockets.on('connection', function(socket){
           io.to(socket.id).emit('user_data')
           return
       }
-      if (data.k_nick != user.k_nick || data.k_img != user.k_img){
+      if (data.k_nick != user.k_nick || ){
         db.change_user_data(data)
         user.k_nick = data.k_nick
+        db.set_stat(data.k_id, 'chg_nick', user.k_nick+"->"+data.k_nick)
+      }
+      if (data.k_img != user.k_img){
+        db.change_user_data(data)
         user.k_img = data.k_img
+        db.set_stat(data.k_id, 'chg_img', user.k_nick+"->"+data.k_nick)
       }
     }
 
     db.set_stat(data.k_id, 'on')
+    console.log(user)
 
     let wel_msg = data.k_nick + '님이 접속 하셨습니다.'
     io.sockets.emit('update', {
@@ -115,10 +121,8 @@ io.sockets.on('connection', function(socket){
 })
 
 app.get('/', function(request, response){
-  //console.log('유저가 /로 접속했습니다.')
-  //response.send('Hello Express Server')
 })
 
 server.listen(8080, function() {
-  console.log('서버 실행중..')
+    console.log('서버 실행중..')
 })
